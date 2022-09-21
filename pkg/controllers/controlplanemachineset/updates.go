@@ -601,6 +601,7 @@ func sortMachineInfoByCreationTimestamp(machineInfos []machineproviders.MachineI
 	sort.Slice(machineInfos, func(i, j int) bool {
 		return machineInfos[i].MachineRef.ObjectMeta.CreationTimestamp.Before(&machineInfos[j].MachineRef.ObjectMeta.CreationTimestamp)
 	})
+
 	return machineInfos
 }
 

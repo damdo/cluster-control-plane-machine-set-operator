@@ -1773,12 +1773,22 @@ var _ = Describe("utils tests", func() {
 		},
 		Entry("when MachineInfo is not sorted by CreationTimestamp",
 			[]machineproviders.MachineInfo{
-				updatedMachineBuilder.WithIndex(0).WithMachineName("machinee-0").WithNodeName("node-0").WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 02, 01, 01, time.UTC))).Build(),
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-newer-0").WithNodeName("node-0").WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 02, 01, 01, time.UTC))).Build(),
 				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 01, 01, 01, time.UTC))).Build(),
 			},
 			[]machineproviders.MachineInfo{
 				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 01, 01, 01, time.UTC))).Build(),
-				updatedMachineBuilder.WithIndex(0).WithMachineName("machinee-0").WithNodeName("node-0").WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 02, 01, 01, time.UTC))).Build(),
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-newer-0").WithNodeName("node-0").WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 02, 01, 01, time.UTC))).Build(),
+			},
+		),
+		Entry("when MachineInfo is already sorted by CreationTimestamp",
+			[]machineproviders.MachineInfo{
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 01, 01, 01, time.UTC))).Build(),
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machinee-newer-0").WithNodeName("node-0").WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 02, 01, 01, time.UTC))).Build(),
+			},
+			[]machineproviders.MachineInfo{
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machine-0").WithNodeName("node-0").WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 01, 01, 01, time.UTC))).Build(),
+				updatedMachineBuilder.WithIndex(0).WithMachineName("machinee-newer-0").WithNodeName("node-0").WithMachineCreationTimestamp(metav1.NewTime(time.Date(2022, 01, 01, 01, 02, 01, 01, time.UTC))).Build(),
 			},
 		),
 	)
