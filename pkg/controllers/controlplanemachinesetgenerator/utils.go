@@ -109,21 +109,6 @@ func sortMachineSetsByCreationTimeAscending(machineSets []machinev1beta1.Machine
 	return machineSets
 }
 
-// controlPlaneMachineSetApplyConfigToControlPlaneMachineSet converts a ControlPlaneMachineSetApplyConfig to a ControlPlaneMachineSet.
-func controlPlaneMachineSetApplyConfigToControlPlaneMachineSet(cpmsApplyConfig machinev1builder.ControlPlaneMachineSetApplyConfiguration) (machinev1.ControlPlaneMachineSet, error) {
-	b, err := json.Marshal(cpmsApplyConfig)
-	if err != nil {
-		return machinev1.ControlPlaneMachineSet{}, fmt.Errorf("failed to encode control plane machine set: %w", err)
-	}
-
-	cpms := machinev1.ControlPlaneMachineSet{}
-	if err := json.Unmarshal(b, &cpms); err != nil {
-		return machinev1.ControlPlaneMachineSet{}, fmt.Errorf("failed to decode control plane machine set: %w", err)
-	}
-
-	return cpms, nil
-}
-
 // genericControlPlaneMachineSetSpec returns a generic ControlPlaneMachineSet spec, without provider specific details.
 func genericControlPlaneMachineSetSpec(replicas int32, clusterID string) machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration {
 	labels := map[string]string{
@@ -206,4 +191,20 @@ func mergeMachineSlices(a []machinev1beta1.Machine, b []machinev1beta1.Machine) 
 	}
 
 	return list
+}
+
+// twoWayConvertApplyConfigToBase converts the input object to the output object,
+// where input and output can be an ApplyConfig and a Base type or viceversa.
+func twoWayConvertApplyConfigToBase[T any](in any) (*T, error) {
+	b, err := json.Marshal(in)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode %T: %w", in, err)
+	}
+
+	out := new(T)
+	if err := json.Unmarshal(b, out); err != nil {
+		return nil, fmt.Errorf("failed to decode %T: %w", b, err)
+	}
+
+	return out, nil
 }

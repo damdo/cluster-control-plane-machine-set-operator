@@ -24,6 +24,8 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	machinev1builder "github.com/openshift/client-go/machine/applyconfigurations/machine/v1"
 	machinev1beta1builder "github.com/openshift/client-go/machine/applyconfigurations/machine/v1beta1"
+
+	"github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 )
 
 const (
@@ -35,61 +37,47 @@ const (
 
 // generateControlPlaneMachineSetAWSSpec generates an AWS flavored ControlPlaneMachineSet Spec.
 func generateControlPlaneMachineSetAWSSpec(machines []machinev1beta1.Machine, machineSets []machinev1beta1.MachineSet) (machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration, error) {
-	awsFailureDomains, err := buildAWSFailureDomains(machineSets)
+	controlPlaneMachineSetMachineFailureDomainsApplyConfig, err := buildAWSFailureDomains(machineSets)
 	if err != nil {
-		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build aws failure domains config: %w", err)
+		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's AWS failure domains: %w", err)
 	}
 
-	controlPlaneMachineSetMachineSpec, err := buildControlPlaneMachineSetAWSMachineSpec(machines)
+	controlPlaneMachineSetMachineSpecApplyConfig, err := buildControlPlaneMachineSetAWSMachineSpec(machines)
 	if err != nil {
 		return machinev1builder.ControlPlaneMachineSetSpecApplyConfiguration{}, fmt.Errorf("failed to build ControlPlaneMachineSet's AWS spec: %w", err)
 	}
 
 	controlPlaneMachineSetApplyConfigSpec := genericControlPlaneMachineSetSpec(replicas, machines[0].ObjectMeta.Labels[clusterIDLabelKey])
-
-	controlPlaneMachineSetApplyConfigSpec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = awsFailureDomains
-	controlPlaneMachineSetApplyConfigSpec.Template.OpenShiftMachineV1Beta1Machine.Spec = controlPlaneMachineSetMachineSpec
+	controlPlaneMachineSetApplyConfigSpec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = controlPlaneMachineSetMachineFailureDomainsApplyConfig
+	controlPlaneMachineSetApplyConfigSpec.Template.OpenShiftMachineV1Beta1Machine.Spec = controlPlaneMachineSetMachineSpecApplyConfig
 
 	return controlPlaneMachineSetApplyConfigSpec, nil
 }
 
 // buildAWSFailureDomains builds an AWSFailureDomain config for the ControlPlaneMachineSet from cluster's MachineSets.
 func buildAWSFailureDomains(machineSets []machinev1beta1.MachineSet) (*machinev1builder.FailureDomainsApplyConfiguration, error) {
-	awsFailureDomains := []machinev1builder.AWSFailureDomainApplyConfiguration{}
-
-	// Loop over all the MachineSets to find all the failure domains in the cluster,
-	// and construct the FailureDomain configuration for the ControlPlaneMachineSet Spec.
-	for _, machineSet := range machineSets {
-		awsPs, err := extractAWSProviderSpec(machineSet.Spec.Template.Spec.ProviderSpec)
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract machine's aws providerSpec: %w", err)
-		}
-
-		cf := machinev1builder.AWSFailureDomainApplyConfiguration{}
-		cf.Placement = &machinev1builder.AWSFailureDomainPlacementApplyConfiguration{
-			AvailabilityZone: &awsPs.Placement.AvailabilityZone,
-		}
-
-		filters := []machinev1builder.AWSResourceFilterApplyConfiguration{}
-		for _, f := range awsPs.Subnet.Filters {
-			filters = append(filters, machinev1builder.AWSResourceFilterApplyConfiguration{Values: f.Values, Name: &(f.Name)})
-		}
-
-		subnetType := machinev1.AWSFiltersReferenceType
-		cf.Subnet = &machinev1builder.AWSResourceReferenceApplyConfiguration{
-			Type:    &subnetType,
-			Filters: &filters,
-		}
-
-		awsFailureDomains = append(awsFailureDomains, cf)
+	failureDomains, err := providerconfig.ExtractFailureDomainsFromMachineSets(machineSets)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build aws failure domains config: %w", err)
 	}
 
-	platform := configv1.AWSPlatformType
+	awsFailureDomains := []machinev1.AWSFailureDomain{}
+	for _, fd := range failureDomains {
+		awsFailureDomains = append(awsFailureDomains, fd.AWS())
+	}
 
-	return &machinev1builder.FailureDomainsApplyConfiguration{
+	cpmsFailureDomains := machinev1.FailureDomains{
 		AWS:      &awsFailureDomains,
-		Platform: &platform,
-	}, nil
+		Platform: configv1.AWSPlatformType,
+	}
+
+	cpmsFailureDomainsApplyConfig, err := twoWayConvertApplyConfigToBase[machinev1builder.FailureDomainsApplyConfiguration](cpmsFailureDomains)
+	if err != nil {
+		return nil,
+			fmt.Errorf("failed to convert machinev1.FailureDomains to machinev1builder.FailureDomainsApplyConfiguration: %w", err)
+	}
+
+	return cpmsFailureDomainsApplyConfig, nil
 }
 
 // buildControlPlaneMachineSetAWSMachineSpec builds an AWS flavored MachineSpec for the ControlPlaneMachineSet.
@@ -101,14 +89,12 @@ func buildControlPlaneMachineSetAWSMachineSpec(machines []machinev1beta1.Machine
 	// This is done so that if there are control plane machines with differing
 	// Provider Specs, we will use the most recent one. This is an attempt to try and inferr
 	// the spec that the user might want to choose among the different ones found in the cluster.
-	referenceProviderSpec := machines[0].Spec.ProviderSpec
-
-	// Extract the AWS Provider Spec from the generic Provider Spec.
-	awsPs, err := extractAWSProviderSpec(referenceProviderSpec)
+	providerConfig, err := providerconfig.NewProviderConfigFromMachineSpec(machines[0].Spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract machine's aws providerSpec: %w", err)
 	}
 
+	awsPs := providerConfig.AWS().Config()
 	// Remove from the extracted AWS Provider Spec the Failure domains,
 	// as those are already present in the ControlPlaneMachineSet spec.
 	awsPs.Subnet = machinev1beta1.AWSResourceReference{}
@@ -117,7 +103,7 @@ func buildControlPlaneMachineSetAWSMachineSpec(machines []machinev1beta1.Machine
 	platform := configv1.AWSPlatformType
 
 	// Re-encode the AWS Provider Spec into a generic Provider Spec Raw Value.
-	rawProviderSpecValue, err := rawExtensionFromProviderSpec(platform, *awsPs)
+	rawProviderSpecValue, err := rawExtensionFromProviderSpec(platform, awsPs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode machine providerSpec: %w", err)
 	}

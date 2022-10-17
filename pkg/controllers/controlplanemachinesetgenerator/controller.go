@@ -232,12 +232,12 @@ func (r *ControlPlaneMachineSetGeneratorReconciler) generateControlPlaneMachineS
 
 	cpmsApplyConfig := machinev1builder.ControlPlaneMachineSet(clusterControlPlaneMachineSetName, r.Namespace).WithSpec(&cpmsSpecApplyConfig)
 
-	newCPMS, err := controlPlaneMachineSetApplyConfigToControlPlaneMachineSet(*cpmsApplyConfig)
+	newCPMS, err := twoWayConvertApplyConfigToBase[machinev1.ControlPlaneMachineSet](*cpmsApplyConfig)
 	if err != nil {
 		return &machinev1.ControlPlaneMachineSet{}, fmt.Errorf("unable to convert ControlPlaneMachineSetApplyConfig to ControlPlaneMachineSet: %w", err)
 	}
 
-	return &newCPMS, nil
+	return newCPMS, nil
 }
 
 // ensureControlPlaneMachineSet ensures that the ControlPlaneMachineSet has been created.

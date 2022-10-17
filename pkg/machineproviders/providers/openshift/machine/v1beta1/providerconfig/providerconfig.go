@@ -88,14 +88,14 @@ func NewProviderConfigFromMachineTemplate(tmpl machinev1.OpenShiftMachineV1Beta1
 	return newProviderConfigFromProviderSpec(tmpl.Spec.ProviderSpec, platformType)
 }
 
-// NewProviderConfigFromMachine creates a new ProviderConfig from the provided machine object.
-func NewProviderConfigFromMachine(machine machinev1beta1.Machine) (ProviderConfig, error) {
-	platformType, err := getPlatformTypeFromProviderSpec(machine.Spec.ProviderSpec)
+// NewProviderConfigFromMachineSpec creates a new ProviderConfig from the provided machineSpec object.
+func NewProviderConfigFromMachineSpec(machineSpec machinev1beta1.MachineSpec) (ProviderConfig, error) {
+	platformType, err := getPlatformTypeFromProviderSpec(machineSpec.ProviderSpec)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine platform type: %w", err)
 	}
 
-	return newProviderConfigFromProviderSpec(machine.Spec.ProviderSpec, platformType)
+	return newProviderConfigFromProviderSpec(machineSpec.ProviderSpec, platformType)
 }
 
 func newProviderConfigFromProviderSpec(providerSpec machinev1beta1.ProviderSpec, platformType configv1.PlatformType) (ProviderConfig, error) {
@@ -300,7 +300,7 @@ func ExtractFailureDomainsFromMachines(machines []machinev1beta1.Machine) ([]fai
 	machineFailureDomains := []failuredomain.FailureDomain{}
 
 	for _, machine := range machines {
-		providerconfig, err := NewProviderConfigFromMachine(machine)
+		providerconfig, err := NewProviderConfigFromMachineSpec(machine.Spec)
 		if err != nil {
 			return nil, fmt.Errorf("error getting failure domain from machine %s: %w", machine.Name, err)
 		}
@@ -313,10 +313,26 @@ func ExtractFailureDomainsFromMachines(machines []machinev1beta1.Machine) ([]fai
 
 // ExtractFailureDomainFromMachine FailureDomain extracted from the provided machine.
 func ExtractFailureDomainFromMachine(machine machinev1beta1.Machine) (failuredomain.FailureDomain, error) {
-	providerConfig, err := NewProviderConfigFromMachine(machine)
+	providerConfig, err := NewProviderConfigFromMachineSpec(machine.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("error getting failure domain from machine %s: %w", machine.Name, err)
 	}
 
 	return providerConfig.ExtractFailureDomain(), nil
+}
+
+// ExtractFailureDomainsFromMachineSets creates list of FailureDomains extracted from the provided list of machineSets.
+func ExtractFailureDomainsFromMachineSets(machineSets []machinev1beta1.MachineSet) ([]failuredomain.FailureDomain, error) {
+	machineSetFailureDomains := []failuredomain.FailureDomain{}
+
+	for _, machineSet := range machineSets {
+		providerconfig, err := NewProviderConfigFromMachineSpec(machineSet.Spec.Template.Spec)
+		if err != nil {
+			return nil, fmt.Errorf("error getting failure domain from machineSet %s: %w", machineSet.Name, err)
+		}
+
+		machineSetFailureDomains = append(machineSetFailureDomains, providerconfig.ExtractFailureDomain())
+	}
+
+	return machineSetFailureDomains, nil
 }
