@@ -71,8 +71,8 @@ func buildAWSFailureDomains(machineSets []machinev1beta1.MachineSet) (*machinev1
 		Platform: configv1.AWSPlatformType,
 	}
 
-	cpmsFailureDomainsApplyConfig, err := twoWayConvertApplyConfigToBase[machinev1builder.FailureDomainsApplyConfiguration](cpmsFailureDomains)
-	if err != nil {
+	cpmsFailureDomainsApplyConfig := &machinev1builder.FailureDomainsApplyConfiguration{}
+	if err := convertViaJSON(cpmsFailureDomains, cpmsFailureDomainsApplyConfig); err != nil {
 		return nil,
 			fmt.Errorf("failed to convert machinev1.FailureDomains to machinev1builder.FailureDomainsApplyConfiguration: %w", err)
 	}

@@ -193,18 +193,18 @@ func mergeMachineSlices(a []machinev1beta1.Machine, b []machinev1beta1.Machine) 
 	return list
 }
 
-// twoWayConvertApplyConfigToBase converts the input object to the output object,
-// where input and output can be an ApplyConfig and a Base type or viceversa.
-func twoWayConvertApplyConfigToBase[T any](in any) (*T, error) {
+// convertViaJSON converts the input object to the output object,
+// by JSON marshaling and unmarshaling them.
+// Mainly useful to convert Base types into ApplyConfig types and viceversa.
+func convertViaJSON(in, out interface{}) error {
 	b, err := json.Marshal(in)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode %T: %w", in, err)
+		return fmt.Errorf("error marshalling input: %w", err)
 	}
 
-	out := new(T)
 	if err := json.Unmarshal(b, out); err != nil {
-		return nil, fmt.Errorf("failed to decode %T: %w", b, err)
+		return fmt.Errorf("error unmarshalling marshalled input: %w", err)
 	}
 
-	return out, nil
+	return nil
 }
